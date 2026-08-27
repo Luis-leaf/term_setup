@@ -1,0 +1,24 @@
+.DS_Store
+*.swp
+*.swo
+
+# Segredos locais: use .env.example para compartilhar apenas o formato.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Artefatos locais e temporários.
+.nvimlog
+*.log
+*.tmp
+*.bak
+*~
+
+# Estado/cache que pode ser criado pelo Neovim.
+config/nvim/data/
+config/nvim/lazy/
+config/nvim/mason/

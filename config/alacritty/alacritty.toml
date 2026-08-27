@@ -1,0 +1,74 @@
+# ==============================
+# ALACRITTY - CONFIGURAÇÃO PROFISSIONAL
+# ==============================
+
+[general]
+live_config_reload = true
+
+[font]
+size = 14.0
+# Fonte JetBrainsMono Nerd Font para Powerlevel10k e ícones
+[font.normal]
+family = "JetBrainsMono Nerd Font"
+style = "Regular"
+
+[font.bold]
+family = "JetBrainsMono Nerd Font"
+style = "Bold"
+
+[font.italic]
+family = "JetBrainsMono Nerd Font"
+style = "Italic"
+
+# ==============================
+# CORES DE FUNDO E TEXTO
+# ==============================
+[colors.primary]
+background = "0x000000"  # fundo preto puro
+foreground = "0xe5e9f0"  # texto claro estilo Nord
+
+# ==============================
+# CORES NORMAIS
+# ==============================
+[colors.normal]
+black   = "0x000000"
+red     = "0xff5555"
+green   = "0x50fa7b"
+yellow  = "0xf1fa8c"
+blue    = "0x6272a4"
+magenta = "0xff79c6"
+cyan    = "0x8be9fd"
+white   = "0xe5e9f0"
+
+[colors.bright]
+black   = "0x555555"
+red     = "0xff6e6e"
+green   = "0x69ff94"
+yellow  = "0xffffa5"
+blue    = "0x8be9fd"
+magenta = "0xff92df"
+cyan    = "0xa4ffff"
+white   = "0xffffff"
+
+# ==============================
+# OPÇÕES DE JANELA
+# ==============================
+[window]
+padding = { x = 10, y = 10 }
+dynamic_title = true
+decorations = "full"
+
+# ==============================
+# SCROLL
+# ==============================
+[scrolling]
+history = 10000
+multiplier = 3
+
+# ==============================
+# CURSOR
+# ==============================
+[cursor]
+style = "Beam"
+
+
