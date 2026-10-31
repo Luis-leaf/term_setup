@@ -12,24 +12,13 @@ Este repositório transforma o ambiente atual em um setup portátil, centrado no
 
 O diretório `config/` é a fonte de verdade. O arquivo `install.sh` instala ferramentas e copia essas configurações para a home do usuário. Ele não altera o repositório de origem nem atualiza automaticamente instalações já existentes do Oh My Zsh ou de plugins.
 
-## O que foi preservado do computador atual
+## Visual
 
-- Zsh com Oh My Zsh, tema Powerlevel10k, `git`, `zsh-autosuggestions` e `zsh-syntax-highlighting`.
-- Seu prompt completo em `config/zsh/.p10k.zsh`, incluindo ícones Nerd Font e layout atual.
-- tmux com mouse, histórico de 50 mil linhas, índices a partir de 1, modo de cópia Vim e integração com `wl-copy`.
-- Notificações por sino (BEL): no tmux, uma janela em segundo plano que recebe `\a` tem a guia pintada de **amarelo** na barra (assim como a selecionada fica verde) até você entrar nela. Sem ícones nem pop-ups. Os hooks `Stop` e `Notification` do Claude Code (`config/claude/hooks.json`) enviam esse BEL para o painel certo quando o agente termina ou pede permissão. O instalador **mescla** esses hooks em `~/.claude/settings.json` (com backup) sem apagar suas outras preferências nem duplicar hooks.
-- Alacritty com JetBrainsMono Nerd Font, tamanho 14, fundo preto e a paleta atual.
-- LazyVim, o lockfile de plugins, TokyoDark, realces para Python e `venv-selector`.
 
 ![Barra do tmux: guia selecionada em verde, guia "claude" pedindo atenção em amarelo](docs/img/tmux-alerta.png)
 
 *Guia `1:shell` selecionada (verde) e `3:claude` pedindo atenção (amarelo), porque o Claude Code terminou a tarefa nessa janela. Ao entrar nela, a guia volta ao cinza.*
 
-<!-- PRINT: Alacritty no seu desktop real com tmux + Claude Code rodando.
-     Salve como docs/img/desktop.png e troque este comentário por:
-     ![Setup completo no desktop](docs/img/desktop.png) -->
-
-Havia dois formatos de configuração do Alacritty no computador: `alacritty.toml` e `alacritty.yml`, com cores diferentes. Só o TOML foi versionado, pois é o formato atual e o Alacritty recente o prioriza. O YAML foi propositalmente deixado de fora. Também alinhei a declaração global do tema do Neovim para `tokyodark`, que já era o tema efetivamente escolhido pelo plugin.
 
 ## Requisitos e limitações
 
@@ -168,9 +157,6 @@ O `make test` sobe um container limpo, com um usuário comum com `sudo`, e roda 
 
 **Modo gráfico (`make try-gui`).** Abre um desktop virtual (Xvfb + noVNC) com o Alacritty rodando tmux.
 
-<!-- PRINT: navegador em http://localhost:6080 mostrando o Alacritty do `make try-gui`.
-     Salve como docs/img/try-gui.png e troque este comentário por:
-     ![Modo gráfico da homologação no navegador](docs/img/try-gui.png) -->
  Acesse <http://localhost:6080/vnc.html?autoconnect=1&resize=remote> — a porta só escuta em `127.0.0.1`. É a única forma de ver fonte, cores e a barra do tmux como ficarão no PC. Peso medido (Debian 13, sem compressão):
 
 | Imagem | Tamanho | Uso |
@@ -265,58 +251,6 @@ Alguns atalhos padrão do tmux configurado aqui:
 
 Uma disposição simples que funciona bem é: editor em um painel grande, servidor/testes em outro e Codex em uma janela própria. O tmux mantém tudo rodando mesmo se você fechar o Alacritty ou trocar de terminal.
 
-## Como colaborar bem com Codex
-
-Entre no diretório do repositório antes de iniciar o Codex. O agente consegue então examinar os arquivos relevantes, entender a estrutura e executar os testes que já existem. Para tarefas maiores, descreva objetivo, restrições e como saber que terminou.
-
-Bom pedido:
-
-```text
-No módulo de autenticação, adicione login por token. Preserve a API atual,
-escreva testes de sucesso e erro, execute a suíte relevante e mostre os arquivos alterados.
-```
-
-Pedidos úteis para cada fase:
-
-- Explorar: “Leia este repositório e explique o fluxo de criação de usuários. Não altere arquivos.”
-- Planejar: “Proponha um plano curto para migrar X; aponte riscos antes de editar.”
-- Implementar: “Implemente o plano, mantenha a compatibilidade e execute os testes Y.”
-- Revisar: “Revise o diff atual em busca de bugs, regressões e lacunas de teste; não altere nada.”
-- Diagnosticar: “Reproduza a falha, encontre a causa e explique-a; não aplique correção ainda.”
-
-O detalhe que mais melhora o resultado é explicitar o limite de autonomia: diga “apenas leitura”, “não altere dependências”, “não faça push”, “pode editar e testar” ou “pare antes de qualquer migração”. Para mudanças com impacto maior, peça um plano antes da implementação; para tarefas pequenas e bem delimitadas, peça diretamente a mudança e o teste. A [documentação oficial de casos de uso do Codex](https://developers.openai.com/codex/use-cases) também reúne exemplos de análise de repositórios, automação e revisão.
-
-## Atualização e manutenção
-
-Edite sempre o arquivo dentro de `config/`, não somente o arquivo em `~`. Em seguida reaplique:
-
-```bash
-cd ~/src/ia_setup
-git pull
-bash ./install.sh --skip-chsh
-```
-
-Para atualizar plugins manualmente no Neovim, use `:Lazy update`. Isso altera `lazy-lock.json`; revise e faça commit desse lockfile se quiser que a próxima máquina receba exatamente as mesmas versões. Para reinstalar as versões já travadas, rode:
-
-```bash
-nvim --headless '+Lazy! sync' +qa
-```
-
-Se você personalizar a configuração diretamente na home, traga a mudança de volta ao repositório antes de trocar de PC. Exemplos:
-
-```bash
-cp ~/.tmux.conf config/tmux/tmux.conf
-cp ~/.config/alacritty/alacritty.toml config/alacritty/alacritty.toml
-cp -a ~/.config/nvim/. config/nvim/
-```
-
-Revise o diff e faça commit:
-
-```bash
-git diff
-git add config install.sh README.md
-git commit -m 'Atualiza setup de terminal'
-```
 
 ## Solução de problemas
 
@@ -329,7 +263,4 @@ git commit -m 'Atualiza setup de terminal'
 | Prompt do Zsh não aparece | Tema Powerlevel10k não foi clonado | Confirme `~/.oh-my-zsh/custom/themes/powerlevel10k`. |
 | Alacritty não abre em servidor/headless | Ele requer uma sessão gráfica | Use tmux e Neovim no terminal disponível. |
 
-## O que não entra neste repositório
-
-Não foram copiados credenciais, chaves SSH, configurações de Git com nome/e-mail, tokens, perfis de cloud nem a instalação do NVM. Mantenha esses itens em um gerenciador de segredos ou em um processo separado. O `.zshrc` continua compatível com NVM quando ele já estiver instalado, mas não instala Node automaticamente.
 
