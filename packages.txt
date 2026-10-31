@@ -1,0 +1,22 @@
+# Pacotes apt instalados por install.sh e conferidos por scripts/check-deps.sh.
+# Um pacote por linha; linhas vazias e comentários (#) são ignorados.
+# A palavra "opcional" após o nome indica um pacote que pode não existir no apt
+# de algumas versões (ex.: alacritty no Ubuntu 22.04): ele é pulado com aviso.
+ca-certificates
+curl
+git
+jq
+zsh
+tmux
+alacritty opcional
+wl-clipboard
+xclip
+ripgrep
+fd-find
+fzf
+fontconfig
+unzip
+build-essential
+python3
+python3-pip
+python3-venv

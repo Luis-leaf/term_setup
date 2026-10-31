@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "t=$(tmux display -p -t \"$TMUX_PANE\" '#{pane_tty}' 2>/dev/null); printf '\\a' > \"${t:-/dev/tty}\""
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "t=$(tmux display -p -t \"$TMUX_PANE\" '#{pane_tty}' 2>/dev/null); printf '\\a' > \"${t:-/dev/tty}\""
+          }
+        ]
+      }
+    ]
+  }
+}

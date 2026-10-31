@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Instala o ambiente de terminal deste repositório em Debian/Ubuntu.
-# Uso: bash ./install.sh [--dry-run] [--skip-chsh] [--skip-nvim-sync]
+# Uso: bash ./install.sh [--check] [--dry-run] [--skip-chsh] [--skip-nvim-sync]
 
 set -Eeuo pipefail
 
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly CONFIG_DIR="$SCRIPT_DIR/config"
+readonly PACKAGES_FILE="$SCRIPT_DIR/packages.txt"
 readonly NVIM_VERSION="v0.11.5"
 readonly NERD_FONT_VERSION="v3.3.0"
 
@@ -19,6 +20,7 @@ usage() {
 Uso: bash ./install.sh [opções]
 
 Opções:
+  --check           Só verifica dependências (scripts/check-deps.sh) e sai.
   --dry-run         Mostra as ações sem alterar o sistema.
   --skip-chsh       Não torna o zsh o shell de login.
   --skip-nvim-sync  Não baixa plugins do LazyVim no final.
@@ -39,6 +41,7 @@ run() {
 
 while (($#)); do
   case "$1" in
+    --check) exec bash "$SCRIPT_DIR/scripts/check-deps.sh" ;;
     --dry-run) DRY_RUN=true ;;
     --skip-chsh) SKIP_CHSH=true ;;
     --skip-nvim-sync) SKIP_NVIM_SYNC=true ;;
@@ -51,8 +54,9 @@ done
 [[ -f /etc/os-release ]] || die "Não encontrei /etc/os-release. Este instalador atende Debian e Ubuntu."
 # shellcheck disable=SC1091
 source /etc/os-release
-case "${ID:-}" in
-  debian|ubuntu) ;;
+# Derivadas (Linux Mint, Pop!_OS, ...) declaram a base em ID_LIKE.
+case " ${ID:-} ${ID_LIKE:-} " in
+  *" debian "*|*" ubuntu "*) ;;
   *) die "Distribuição não suportada: ${PRETTY_NAME:-desconhecida}. Use Debian ou Ubuntu." ;;
 esac
 
@@ -113,13 +117,27 @@ clone_if_missing() {
   run git clone --depth=1 "$repository" "$destination"
 }
 
+# Verdadeiro se o apt tem uma versão instalável do pacote. "apt-cache show"
+# não serve: ele aceita pacotes só referenciados por outros, sem candidato.
+apt_has_candidate() {
+  local candidate
+  candidate="$(LC_ALL=C apt-cache policy "$1" 2>/dev/null | awk '/Candidate:/ {print $2}')"
+  [[ -n "$candidate" && "$candidate" != "(none)" ]]
+}
+
 install_packages() {
   log "Instalando pacotes do sistema (${PRETTY_NAME})"
+  local packages=() name flag
+  [[ -f "$PACKAGES_FILE" ]] || die "Lista de pacotes ausente: $PACKAGES_FILE"
   run "${SUDO[@]}" apt-get update
-  run "${SUDO[@]}" apt-get install --yes --no-install-recommends \
-    ca-certificates curl git zsh tmux alacritty wl-clipboard xclip \
-    ripgrep fd-find fzf fontconfig unzip build-essential \
-    python3 python3-pip python3-venv
+  while read -r name flag; do
+    if [[ "$flag" == opcional ]] && ! apt_has_candidate "$name"; then
+      warn "Pacote opcional '$name' não existe no apt de ${PRETTY_NAME}; pulando."
+      continue
+    fi
+    packages+=("$name")
+  done < <(sed -e 's/#.*//' "$PACKAGES_FILE" | awk 'NF')
+  run "${SUDO[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends "${packages[@]}"
 }
 
 install_fd_alias() {
@@ -219,6 +237,55 @@ install_oh_my_zsh() {
   clone_if_missing https://github.com/zsh-users/zsh-syntax-highlighting.git "$HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting"
 }
 
+# Mescla os hooks de notificação do Claude Code em ~/.claude/settings.json
+# sem sobrescrever as demais preferências do usuário. Cada hook é adicionado
+# apenas se ainda não existir, então reaplicar não duplica nada.
+install_claude_hooks() {
+  local source_file="$CONFIG_DIR/claude/hooks.json"
+  local target_file="$HOME/.claude/settings.json"
+  local merged
+
+  [[ -f "$source_file" ]] || die "Arquivo de configuração ausente: $source_file"
+  if ! command -v jq >/dev/null 2>&1; then
+    if "$DRY_RUN"; then
+      printf '+ mesclar %q em %q (requer jq)\n' "$source_file" "$target_file"
+      return 0
+    fi
+    die "jq é necessário para mesclar os hooks do Claude Code."
+  fi
+
+  if [[ -f "$target_file" ]]; then
+    jq empty "$target_file" 2>/dev/null || { warn "$target_file não é JSON válido; hooks do Claude não aplicados."; return 0; }
+    merged="$(jq -s '
+      .[0] as $current | .[1].hooks as $new
+      | $current
+      | .hooks = reduce ($new | keys[]) as $event
+          ($current.hooks // {};
+           .[$event] = ((.[$event] // []) as $existing
+             | $existing + [ $new[$event][] | select(. as $h | $existing | index([$h]) | not) ]))
+    ' "$target_file" "$source_file")"
+  else
+    merged="$(cat "$source_file")"
+  fi
+
+  if [[ -f "$target_file" ]] && [[ "$(jq -S . "$target_file")" == "$(jq -S . <<<"$merged")" ]]; then
+    printf '  já está atualizado: %s\n' "$target_file"
+    return 0
+  fi
+
+  if [[ -f "$target_file" ]]; then
+    log "Backup: $target_file -> $BACKUP_DIR/.claude/settings.json"
+    run install -d -m 700 "$BACKUP_DIR/.claude"
+    run cp -a -- "$target_file" "$BACKUP_DIR/.claude/settings.json"
+  fi
+  printf '+ mesclar hooks de notificação em %q\n' "$target_file"
+  if ! "$DRY_RUN"; then
+    install -d -m 700 "$HOME/.claude"
+    printf '%s\n' "$merged" > "$target_file"
+    chmod 600 "$target_file"
+  fi
+}
+
 set_login_shell() {
   "$SKIP_CHSH" && return 0
   local desired_shell current_shell
@@ -239,7 +306,14 @@ sync_lazyvim() {
   local nvim_binary="$HOME/.local/bin/nvim"
   [[ -x "$nvim_binary" || -L "$nvim_binary" ]] || { warn "Neovim não encontrado; plugins não foram instalados."; return 0; }
   log "Baixando plugins fixados do LazyVim"
-  run "$nvim_binary" --headless "+Lazy! sync" +qa
+  # "restore" instala exatamente as versões do lazy-lock.json; "sync" atualizaria
+  # os plugins e reescreveria o lockfile (gerando backup a cada reinstalação).
+  # Na primeira abertura, porém, o lazy.nvim instala os plugins ausentes na versão
+  # mais recente e sobrescreve o lockfile antes do restore. Por isso o lockfile do
+  # repositório é recolocado e o restore roda de novo, agora com as versões fixadas.
+  run "$nvim_binary" --headless "+Lazy! restore" +qa
+  run install -m 600 "$CONFIG_DIR/nvim/lazy-lock.json" "$HOME/.config/nvim/lazy-lock.json"
+  run "$nvim_binary" --headless "+Lazy! restore" +qa
 }
 
 verify_installation() {
@@ -247,7 +321,11 @@ verify_installation() {
   zsh --version
   tmux -V
   "$HOME/.local/bin/nvim" --version | head -n 1
-  alacritty --version
+  if command -v alacritty >/dev/null 2>&1; then
+    alacritty --version
+  else
+    warn "Alacritty não instalado (indisponível no apt). Veja https://github.com/alacritty/alacritty/blob/master/INSTALL.md"
+  fi
   fc-match 'JetBrainsMono Nerd Font' | head -n 1
   printf '\nConcluído. Abra um novo terminal ou execute: exec zsh\n'
   printf 'Backups (se necessários): %s\n' "$BACKUP_DIR"
@@ -267,6 +345,7 @@ main() {
   install_dotfile "$CONFIG_DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
   install_dotfile "$CONFIG_DIR/alacritty/alacritty.toml" "$HOME/.config/alacritty/alacritty.toml"
   install_nvim_config
+  install_claude_hooks
 
   set_login_shell
   sync_lazyvim
